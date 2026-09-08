@@ -1,0 +1,6 @@
+ProcessName,AT,BT,Priority,IOtriggerTime,IODuration
+ATM_Login,0,4,2,2,2
+Transaction,1,8,1,4,3
+Fraud_Check,2,5,1,2,2
+Database_Update,3,6,3,3,2
+Notification,5,3,4,-1,0

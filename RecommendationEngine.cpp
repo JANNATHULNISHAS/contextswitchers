@@ -16,8 +16,8 @@ RecommendationEngine::recommend(
     const int processCount =
         metrics.getProcessCount();
  
-    const int priorityLevels =
-        metrics.getPriorityLevelCount();
+   /* const int priorityLevels =
+        metrics.getPriorityLevelCount();*/
  
     const int highestPriorityCount =
         metrics.getHighestPriorityProcessCount();
@@ -73,10 +73,10 @@ RecommendationEngine::recommend(
      * Multiple priority levels indicate that
      * priority-aware scheduling may be useful.
      */
-    if (priorityLevels >= 4)
+   /*if (priorityLevels >= 4)
     {
         return recommendPriority(metrics);
-    }
+    }*/
  
     /*
      * Default:

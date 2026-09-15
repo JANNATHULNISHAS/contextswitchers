@@ -1,12 +1,10 @@
-#include <iostream>
- 
-#include "SimulationManager.h"
+#include "ApplicationMenu.h"
  
 int main()
 {
-    SimulationManager manager;
+    ApplicationMenu menu;
  
-    manager.run("data/banking.csv");
+    menu.run();
  
     return 0;
 }

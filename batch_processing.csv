@@ -1,1 +1,6 @@
-
+ProcessName,AT,BT,Priority,IOtriggerTime,IODuration
+Data_Ingestion,0,2,4,-1,0
+Report_Generation,0,18,6,-1,0
+Data_Cleanup,0,5,3,-1,0
+Backup_Process,0,14,7,-1,0
+Archive_Process,0,30,5,-1,0

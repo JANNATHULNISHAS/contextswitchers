@@ -1,1 +1,7 @@
-
+ProcessName,AT,BT,Priority,IOtriggerTime,IODuration
+Order_Processing,0,6,3,3,2
+Payment_Verification,1,4,2,2,2
+Inventory_Update,2,8,4,4,3
+Fraud_Detection,3,5,1,2,2
+Shipping_Request,5,3,5,-1,0
+Customer_Notification,6,7,6,-1,0

@@ -1,45 +1,46 @@
 #include "PriorityScheduler.h"
- 
+#include "SimulationEvent.h"
+
 #include <vector>
 #include <string>
- 
+
 ExecutionResult PriorityScheduler::schedule(
     const std::vector<ProcessModel>& inputProcesses)
 {
     std::vector<ProcessModel> processes = inputProcesses;
- 
+
     ExecutionResult result(
         AlgorithmType::PRIORITY_NON_PREEMPTIVE
     );
- 
+
     const std::size_t processCount =
         processes.size();
- 
+
     if (processCount == 0)
     {
         return result;
     }
- 
+
     std::vector<bool> admitted(
         processCount,
         false
     );
- 
+
     std::vector<int> ioEndTime(
         processCount,
         -1
     );
- 
+
     int currentProcess = -1;
- 
+
     int time = 0;
     int busyTime = 0;
     int idleTime = 0;
     int contextSwitches = 0;
     int completedCount = 0;
- 
+
     std::string previousProcess = "";
- 
+
     while (completedCount <
            static_cast<int>(processCount))
     {
@@ -54,13 +55,23 @@ ExecutionResult PriorityScheduler::schedule(
                 processes[i].getArrivalTime() <= time)
             {
                 admitted[i] = true;
- 
-                processes[i].changeState(
-                    ProcessState::READY
+
+                changeProcessState(
+                    processes[i],
+                    ProcessState::READY,
+                    time
+                );
+
+                notifyEvent(
+                    SimulationEvent(
+                        processes[i].getName(),
+                        time,
+                        SimulationEventType::ARRIVAL
+                    )
                 );
             }
         }
- 
+
         /*
          * Move processes from WAITING to READY
          * after their complete I/O duration.
@@ -74,14 +85,24 @@ ExecutionResult PriorityScheduler::schedule(
                 ioEndTime[i] != -1 &&
                 time >= ioEndTime[i])
             {
-                processes[i].changeState(
-                    ProcessState::READY
+                changeProcessState(
+                    processes[i],
+                    ProcessState::READY,
+                    time
                 );
- 
+
+                notifyEvent(
+                    SimulationEvent(
+                        processes[i].getName(),
+                        time,
+                        SimulationEventType::IO_COMPLETED
+                    )
+                );
+
                 ioEndTime[i] = -1;
             }
         }
- 
+
         /*
          * Select the READY process with the
          * highest priority.
@@ -91,7 +112,7 @@ ExecutionResult PriorityScheduler::schedule(
         if (currentProcess == -1)
         {
             int selectedProcess = -1;
- 
+
             for (std::size_t i = 0;
                  i < processCount;
                  ++i)
@@ -101,15 +122,15 @@ ExecutionResult PriorityScheduler::schedule(
                 {
                     continue;
                 }
- 
+
                 if (selectedProcess == -1)
                 {
                     selectedProcess =
                         static_cast<int>(i);
- 
+
                     continue;
                 }
- 
+
                 if (processes[i].getEffectivePriority() <
                     processes[selectedProcess]
                         .getEffectivePriority())
@@ -129,56 +150,82 @@ ExecutionResult PriorityScheduler::schedule(
                         static_cast<int>(i);
                 }
             }
- 
+
             if (selectedProcess != -1)
             {
                 currentProcess = selectedProcess;
- 
+
                 ProcessModel& process =
                     processes[currentProcess];
- 
-                process.changeState(
-                    ProcessState::RUNNING
+
+                changeProcessState(
+                    process,
+                    ProcessState::RUNNING,
+                    time
                 );
- 
+
                 if (process.getStartTime() == -1)
                 {
                     process.setStartTime(time);
                 }
- 
+
                 const std::string& currentName =
                     process.getName();
- 
+
                 if (!previousProcess.empty() &&
                     previousProcess != currentName)
                 {
                     ++contextSwitches;
+
+                    notifyEvent(
+                        SimulationEvent(
+                            currentName,
+                            time,
+                            SimulationEventType::CONTEXT_SWITCH
+                        )
+                    );
                 }
- 
+
                 previousProcess = currentName;
+
+                notifyEvent(
+                    SimulationEvent(
+                        currentName,
+                        time,
+                        SimulationEventType::CPU_ALLOCATED
+                    )
+                );
             }
             else
             {
+                notifyEvent(
+                    SimulationEvent(
+                        "CPU",
+                        time,
+                        SimulationEventType::CPU_IDLE
+                    )
+                );
+
                 ++idleTime;
                 ++time;
- 
+
                 continue;
             }
         }
- 
+
         ProcessModel& process =
             processes[currentProcess];
- 
+
         const int sliceStart = time;
- 
+
         /*
          * Execute one CPU time unit.
          */
         process.executeOneUnit();
- 
+
         ++busyTime;
         ++time;
- 
+
         result.addExecutionSlice(
             ExecutionSlice(
                 process.getName(),
@@ -186,29 +233,47 @@ ExecutionResult PriorityScheduler::schedule(
                 time
             )
         );
- 
+
+        notifyEvent(
+            SimulationEvent(
+                process.getName(),
+                sliceStart,
+                SimulationEventType::PROCESS_EXECUTION
+            )
+        );
+
         /*
          * Process completed.
          */
         if (process.getRemainingTime() == 0)
         {
-            process.changeState(
-                ProcessState::COMPLETED
+            changeProcessState(
+                process,
+                ProcessState::COMPLETED,
+                time
             );
- 
+
             process.setCompletionTime(time);
- 
+
             result.addCompletedProcess(
                 process.getName()
             );
- 
+
+            notifyEvent(
+                SimulationEvent(
+                    process.getName(),
+                    time,
+                    SimulationEventType::PROCESS_COMPLETED
+                )
+            );
+
             ++completedCount;
- 
+
             currentProcess = -1;
- 
+
             continue;
         }
- 
+
         /*
          * CSV-defined I/O trigger.
          */
@@ -218,31 +283,38 @@ ExecutionResult PriorityScheduler::schedule(
                 process.getIOTriggerTime())
         {
             process.markIOCompleted();
- 
-            process.changeState(
-                ProcessState::WAITING
+
+            notifyEvent(
+                SimulationEvent(
+                    process.getName(),
+                    time,
+                    SimulationEventType::IO_TRIGGER
+                )
             );
- 
+
+            changeProcessState(
+                process,
+                ProcessState::WAITING,
+                time
+            );
+
             ioEndTime[currentProcess] =
                 time + process.getIODuration();
- 
+
             currentProcess = -1;
         }
     }
- 
+
     result.setTotalExecutionTime(time);
     result.setCPUBusyTime(busyTime);
     result.setCPUIdleTime(idleTime);
     result.setContextSwitches(contextSwitches);
- 
+
     return result;
 }
- 
+
 AlgorithmType
 PriorityScheduler::getAlgorithmType() const
 {
     return AlgorithmType::PRIORITY_NON_PREEMPTIVE;
 }
- 
-
- 
